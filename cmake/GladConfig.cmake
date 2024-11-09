@@ -241,6 +241,16 @@ function(glad_add_library TARGET)
     string(REPLACE "${GLAD_DIR}" GLAD_DIRECTORY GLAD_ARGS_UNIVERSAL "${GLAD_ARGS}")
     set(GLAD_ARGS_PATH "${GLAD_DIR}/args.txt")
 
+    set(GLAD_VENV "${GLAD_DIR}/.venv")
+    if(WIN32)
+        set(GLAD_PYTHON "${GLAD_VENV}/Scripts/python.exe")
+    else()
+        set(GLAD_PYTHON "${GLAD_VENV}/bin/python")
+    endif()
+
+    # the directory where the pyproject.toml is located
+    set(GLAD_PYPROJECT_DIR "${GLAD_SOURCES_DIR}")
+
     # add make custom target
     add_custom_command(
         OUTPUT ${GLAD_FILES} ${GLAD_ARGS_PATH}
@@ -248,7 +258,12 @@ function(glad_add_library TARGET)
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${GLAD_DIR}
         COMMAND ${CMAKE_COMMAND} -E make_directory   ${GLAD_DIR}
         COMMAND echo Generating with args ${GLAD_ARGS}
-        COMMAND ${Python_EXECUTABLE} -m glad ${GLAD_ARGS}
+        # Create the venv to install packages needed for glad
+        COMMAND ${Python_EXECUTABLE} -m venv ${GLAD_VENV}
+        # Install dependencies listed in pyproject.toml
+        # Also, starting from here, we need to use the venv interpreter!
+        COMMAND ${GLAD_PYTHON} -m pip install ${GLAD_PYPROJECT_DIR}
+        COMMAND ${GLAD_PYTHON} -m glad ${GLAD_ARGS}
         COMMAND echo Writing ${GLAD_ARGS_PATH}
         COMMAND echo ${GLAD_ARGS} > ${GLAD_ARGS_PATH}
         WORKING_DIRECTORY $<$<BOOL:${GLAD_SOURCES_DIR}>:${GLAD_SOURCES_DIR}>
