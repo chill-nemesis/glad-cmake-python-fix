@@ -241,11 +241,35 @@ function(glad_add_library TARGET)
     string(REPLACE "${GLAD_DIR}" GLAD_DIRECTORY GLAD_ARGS_UNIVERSAL "${GLAD_ARGS}")
     set(GLAD_ARGS_PATH "${GLAD_DIR}/args.txt")
 
-    set(GLAD_VENV "${GLAD_DIR}/.venv")
-    if(WIN32)
+
+    ##########################
+    ## Create a virtual env ##
+    ##########################
+    # The venv directory we are using for installing dependencies
+    # We should not put that in the gladsources dir directly
+    set(GLAD_VENV "${GLAD_DIR}/../.venv")
+
+    execute_process(
+        COMMAND ${Python_EXECUTABLE} -m venv ${GLAD_VENV}
+        RESULT_VARIABLE CREATE_VENV_RESULT
+    )
+    
+    if(NOT CREATE_VENV_RESULT EQUAL 0)
+        message(FATAL_ERROR "Failed to create virtual environment needed for glad!")
+    endif()
+
+    #########################################################################
+    ## Figure out the python interpreter within the venv (system-agnostic) ##
+    #########################################################################
+    set(GLAD_PYTHON "")
+    if(EXISTS "${GLAD_VENV}/bin/python")
+        set(GLAD_PYTHON "${GLAD_VENV}/bin/python")
+    elseif(EXISTS "${GLAD_VENV}/bin/python.exe") # special case: Host is windows, but running in a unix-like environment like msys
+        set(GLAD_PYTHON "${GLAD_VENV}/bin/python.exe")
+    elseif(EXISTS "${GLAD_VENV}/Scripts/python.exe")
         set(GLAD_PYTHON "${GLAD_VENV}/Scripts/python.exe")
     else()
-        set(GLAD_PYTHON "${GLAD_VENV}/bin/python")
+        message(FATAL_ERROR "Python interpreter not found in the virtual environment.")
     endif()
 
     # the directory where the pyproject.toml is located
@@ -258,10 +282,6 @@ function(glad_add_library TARGET)
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${GLAD_DIR}
         COMMAND ${CMAKE_COMMAND} -E make_directory   ${GLAD_DIR}
         COMMAND echo Generating with args ${GLAD_ARGS}
-        # Create the venv to install packages needed for glad
-        COMMAND ${Python_EXECUTABLE} -m venv ${GLAD_VENV}
-        # Install dependencies listed in pyproject.toml
-        # Also, starting from here, we need to use the venv interpreter!
         COMMAND ${GLAD_PYTHON} -m pip install ${GLAD_PYPROJECT_DIR}
         COMMAND ${GLAD_PYTHON} -m glad ${GLAD_ARGS}
         COMMAND echo Writing ${GLAD_ARGS_PATH}
